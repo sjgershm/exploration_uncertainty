@@ -72,6 +72,11 @@ function results = plot_figures(fig,data)
                 X = [V RU V./TU];
                 C = double(data(s).choice==1);
                 results.b(s,:) = glmfit(X,C,'binomial','link','probit','constant','off');
+                p = glmval(results.b(s,:)',X,'probit','constant','off');
+                results.bic(s,1) = 3*log(length(C)) - C'*log(p) - (1-C')*log(1-p);
+                results.b0(s,:) = glmfit(V,C,'binomial','link','probit','constant','off');
+                p = glmval(results.b0(s,:)',V,'probit','constant','off');
+                results.bic(s,2) = log(length(C)) - C'*log(p) - (1-C')*log(1-p);
             end
             
             [se,mu] = wse(results.b);
