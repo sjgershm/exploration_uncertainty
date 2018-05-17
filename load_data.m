@@ -3,6 +3,8 @@ function data = load_data
     % Load data.
     %
     % USAGE: data = load_data
+    %
+    % cond: 1 = RS, 2 = SR, 3 = RR, 4 = SS
     
     X = csvread('data.csv',1);
     F = {'subject' 'block' 'trial' 'mu1' 'mu2' 'choice' 'reward' 'RT' 'cond'};

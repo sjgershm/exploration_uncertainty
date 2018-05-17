@@ -1,4 +1,4 @@
-function results = plot_figures(fig,data)
+function results = plot_figures(fig,data,results)
     
     switch fig
         
@@ -64,80 +64,49 @@ function results = plot_figures(fig,data)
             
             % Probit analysis of computational variables
             
-            for s = 1:length(data)
-                latents = kalman_filter(data(s));
-                TU = sqrt(latents.s(:,1) + latents.s(:,2));
-                RU = sqrt(latents.s(:,1)) - sqrt(latents.s(:,2));
-                V = latents.m(:,1) - latents.m(:,2);
-                X = [V RU V./TU];
-                C = double(data(s).choice==1);
-                results.b(s,:) = glmfit(X,C,'binomial','link','probit','constant','off');
-                p = glmval(results.b(s,:)',X,'probit','constant','off');
-                results.bic(s,1) = 3*log(length(C)) - 2*(C'*log(p) + (1-C')*log(1-p));
-                results.b0(s,:) = glmfit(V,C,'binomial','link','probit','constant','off');
-                p = glmval(results.b0(s,:)',V,'probit','constant','off');
-                results.bic(s,2) = log(length(C)) - 2*(C'*log(p) + (1-C')*log(1-p));
-            end
-            
-            [se,mu] = wse(results.b);
-            errorbar(mu',se','ok','MarkerSize',12,'MarkerFaceColor','k');
-            set(gca,'FontSize',25,'XTickLabel',{'V' 'RU' 'V/TU'},'XLim',[0.5 3.5],'YLim',[-.05 0.15]);
-            hold on;
-            plot(get(gca,'XLim'),[0 0],'--k','LineWidth',3)
+            load results_glme_fig3
+            results = results_VTURU;
+                        
+            % plot results
+            [beta,~,stats] = fixedEffects(results);
+            errorbar(beta([3 1 2]),stats.SE([3 1 2]),'ok','MarkerSize',12,'MarkerFaceColor','k');
+            set(gca,'FontSize',25,'XTickLabel',{'V' 'RU' 'V/TU'},'XLim',[0.5 3.5],'YLim',[0 1.4]);
             ylabel('Regression coefficient','FontSize',25);
             set(gcf,'Position',[200 200 500 400])
-            
-            % report stats
-            [~,p,~,stat] = ttest(results.b(:,1));
-            disp(['V vs 0: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.b(:,2));
-            disp(['RU vs 0: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.b(:,3));
-            disp(['TU vs 0: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
             
         case 'Figure4'
             
             % Probit analysis of conditions
             
-            for s = 1:length(data)
-                latents = kalman_filter(data(s));
-                V = latents.m(:,1) - latents.m(:,2);
-                N = length(V);
-                ix = false(N,4);
-                for i = 1:4; ix(:,i) = data(s).cond==i; end
-                C = double(data(s).choice==1);
-                X = [ix bsxfun(@times,ix,V)];
-                b = glmfit(X,C,'binomial','link','probit','constant','off');
-                results.intercept(s,:) = b(1:4);
-                results.slope(s,:) = b(5:8);
+            % fit generalized linear mixed effects model
+            if nargin < 3 || isempty(results)
+                tbl = data2table(data,1);
+                formula = 'C ~ -1 + cond + cond:V + (-1 + cond + cond:V|S)';
+                % note: Laplace method not used here because it doesn't seem to complete
+                results = fitglme(tbl,formula,'Distribution','Binomial','Link','Probit','DummyVarCoding','Full');
+                save results_glme_fig4 results
             end
             
+            % hypothesis tests
+            H = [1 -1 0 0 0 0 0 0; 0 0 1 -1 0 0 0 0; 0 0 0 0 1 -1 0 0; 0 0 0 0 0 0 1 -1];   % contrast matrix
+            for i=1:4; [p(i),F(i),DF1(i),DF2(i)] = coefTest(results,H(i,:)); end
+            disp(['intercept, RS vs. SR: F(',num2str(DF1(1)),',',num2str(DF2(1)),') = ',num2str(F(1)),', p = ',num2str(p(1))]);
+            disp(['intercept, RR vs. SS: F(',num2str(DF1(2)),',',num2str(DF2(2)),') = ',num2str(F(2)),', p = ',num2str(p(2))]);
+            disp(['slope, RS vs. SR: F(',num2str(DF1(3)),',',num2str(DF2(3)),') = ',num2str(F(3)),', p = ',num2str(p(3))]);
+            disp(['slope, RR vs. SS: F(',num2str(DF1(4)),',',num2str(DF2(4)),') = ',num2str(F(4)),', p = ',num2str(p(4))]);
+            
+            % plot results
             figure;
-            subplot(1,2,2);
-            [se,mu] = wse(results.slope);
-            errorbar(mu',se','ok','MarkerSize',12,'MarkerFaceColor','k');
-            set(gca,'FontSize',25,'XTickLabel',{'RS' 'SR' 'RR' 'SS'},'XLim',[0.5 4.5]);
-            ylabel('Slope','FontSize',25);
+            [beta,~,stats] = fixedEffects(results);
             subplot(1,2,1);
-            [se,mu] = wse(results.intercept);
-            errorbar(mu',se','ok','MarkerSize',12,'MarkerFaceColor','k');
+            errorbar(beta(1:4),stats.SE(1:4),'ok','MarkerSize',12,'MarkerFaceColor','k');
             set(gca,'FontSize',25,'XTickLabel',{'RS' 'SR' 'RR' 'SS'},'XLim',[0.5 4.5]);
             ylabel('Intercept','FontSize',25);
+            subplot(1,2,2);
+            errorbar(beta(5:8),stats.SE(5:8),'ok','MarkerSize',12,'MarkerFaceColor','k');
+            set(gca,'FontSize',25,'XTickLabel',{'RS' 'SR' 'RR' 'SS'},'XLim',[0.5 4.5]);
+            ylabel('Slope','FontSize',25);
             set(gcf,'Position',[200 200 1000 400])
-            
-            % report stats
-            [~,p,~,stat] = ttest(results.slope(:,1),results.slope(:,2));
-            disp(['slope, RS vs. SR: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.slope(:,3),results.slope(:,4));
-            disp(['slope, RR vs. SS: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.intercept(:,1),results.intercept(:,2));
-            disp(['intercept, RS vs. SR: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.intercept(:,3),results.intercept(:,4));
-            disp(['intercept, RR vs. SS: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.intercept(:,1));
-            disp(['intercept, RS vs. 0: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
-            [~,p,~,stat] = ttest(results.intercept(:,2));
-            disp(['intercept, SR vs. 0: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
             
         case 'Figure5'
             
@@ -155,7 +124,8 @@ function results = plot_figures(fig,data)
             figure;
             [se,mu] = wse(results.rt);
             errorbar(mu',se','ok','MarkerSize',12,'MarkerFaceColor','k');
-            set(gca,'FontSize',25,'XTickLabel',{'Risky' 'Safe' 'RR' 'SS'},'XLim',[0.5 4.5]);
+            %set(gca,'FontSize',25,'XTickLabel',{'Risky' 'Safe' 'RR' 'SS'},'XLim',[0.5 4.5]);
+            set(gca,'FontSize',25,'XTickLabel',{'Risky' 'Safe' 'RR' 'SS' 'RR' 'SS'},'XLim',[0.5 6.5]);
             ylabel('Log response time','FontSize',25);
             set(gcf,'Position',[200 200 500 400])
             
@@ -164,6 +134,148 @@ function results = plot_figures(fig,data)
             disp(['RT, risky vs. safe: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
             [~,p,~,stat] = ttest(results.rt(:,3),results.rt(:,4));
             disp(['RT, RR vs. SS: t(',num2str(stat.df),') = ',num2str(stat.tstat),', p = ',num2str(p)]);
+            
+ %--------------- OTHER FIGURES ---------------%
+            
+        case 'WSLS'
+            
+            % Win-stay-lose-switch
+            K = 8;
+            R = linspace(-30,30,K);
+            D = round(R(1:end-1) + 0.5*diff(R));
+            for s = 1:length(data)
+                c = data(s).choice; r = data(s).reward(1:end-1);
+                
+                N = zeros(size(c));
+                for n = 1:length(c)
+                    if data(s).trial(n)==1; count = [0 0]; end
+                    N(n,1) = count(c(n));
+                    count(c(n)) = count(c(n)) + 1;
+                end
+                
+                stay = c(2:end)==c(1:end-1);
+                risky = (data(s).cond==1&data(s).choice==1) | (data(s).cond==2&data(s).choice==2) | data(s).cond==3;
+                for j = 1:length(R)-1
+                    ix = risky(1:end-1) & data(s).trial(2:end)>1 & r>R(j) & r<=R(j+1);
+                    results.m(s,1,j) =  nanmean(stay(ix));
+                    ix = ~risky(1:end-1) & data(s).trial(2:end)>1 & r>R(j) & r<=R(j+1);
+                    results.m(s,2,j) =  nanmean(stay(ix));
+                    
+                    ix = data(s).trial(2:end)>1 & N(1:end-1)<median(N) & r>R(j) & r<=R(j+1);
+                    results.p(s,1,j) =  nanmean(stay(ix));
+                    ix = data(s).trial(2:end)>1 & N(1:end-1)>=median(N) & r>R(j) & r<=R(j+1);
+                    results.p(s,2,j) =  nanmean(stay(ix));
+                end
+                
+                results.m_change(s,1) = (results.m(s,1,K/2+1) - results.m(s,1,K/2-1))/(D(K/2+1)-D(K/2-1));
+                results.m_change(s,2) = (results.m(s,2,K/2+1) - results.m(s,2,K/2-1))/(D(K/2+1)-D(K/2-1));
+                results.p_change(s,1) = (results.p(s,1,K/2+1) - results.p(s,1,K/2-1))/(D(K/2+1)-D(K/2-1));
+                results.p_change(s,2) = (results.p(s,2,K/2+1) - results.p(s,2,K/2-1))/(D(K/2+1)-D(K/2-1));
+            end
+            
+            figure;
+            subplot(2,2,1)
+            mu = squeeze(nanmean(results.m));
+            se = squeeze(nanstd(results.m)./sqrt(sum(~isnan(results.m))));
+            errorbar(mu',se','-o','MarkerSize',12,'MarkerFaceColor','w','LineWidth',4);
+            set(gca,'FontSize',25,'XLim',[0.5 length(D)+0.5],'XTickLabel',D,'XTick',1:length(D),'YLim',[-0.1 1.1]);
+            ylabel('P(stay)','FontSize',25);
+            xlabel('Last reward','FontSize',25);
+            legend({'Risky' 'Safe'},'FontSize',25,'Location','East');
+            
+            subplot(2,2,2);
+            mu = squeeze(nanmean(results.p));
+            se = squeeze(nanstd(results.p)./sqrt(sum(~isnan(results.p))));
+            errorbar(mu',se','-o','MarkerSize',12,'MarkerFaceColor','w','LineWidth',4);
+            set(gca,'FontSize',25,'XLim',[0.5 length(D)+0.5],'XTickLabel',D,'XTick',1:length(D),'YLim',[-0.1 1.1]);
+            ylabel('P(stay)','FontSize',25);
+            xlabel('Last reward','FontSize',25);
+            legend({'New' 'Old'},'FontSize',25,'Location','East');
+            
+            subplot(2,2,3);
+            [se,mu] = wse(results.m_change);
+            barerrorbar(mu',se');
+            set(gca,'XTickLabel',{'Risky' 'Safe'},'FontSize',25,'XLim',[0.5 2.5]);
+            ylabel('Slope','FontSize',25);
+            
+            subplot(2,2,4);
+            [se,mu] = wse(results.p_change);
+            barerrorbar(mu',se');
+            set(gca,'XTickLabel',{'New' 'Old'},'FontSize',25,'XLim',[0.5 2.5]);
+            ylabel('Slope','FontSize',25);
+            
+            set(gcf,'Position',[200 200 1000 800])
+            
+        case 'RT_switch'
+            
+            % RT stay/switch analysis
+            
+            K = 8;
+            R = linspace(-30,30,K);
+            D = round(R(1:end-1) + 0.5*diff(R));
+            
+            for s = 1:length(data)
+                c = data(s).choice; r = data(s).reward(1:end-1);
+                rt = data(s).RT(1:end-1);
+                stay = c(2:end)==c(1:end-1);
+                
+                ii = data(s).trial(2:end)>1;
+                z = log(rt/1000);
+                X = [z rt z.*rt];
+                b(s,:) = glmfit(X(ii,:),stay(ii),'binomial');
+                
+                N = zeros(size(c));
+                for n = 1:length(c)
+                    if data(s).trial(n)==1; count = [0 0]; end
+                    N(n,1) = count(c(n));
+                    count(c(n)) = count(c(n)) + 1;
+                end
+                
+                for j = 0:5
+                    ix = stay & data(s).trial(2:end)>1 & N(1:end-1)==j;
+                    results.rt(s,1,j+1) =  nanmean(log(rt(ix)));
+                    ix = ~stay & data(s).trial(2:end)>1 & N(1:end-1)==j;
+                    results.rt(s,2,j+1) =  nanmean(log(rt(ix)));
+                end
+                
+                for j = 1:length(R)-1
+                    ix = rt<median(rt) & data(s).trial(2:end)>1 & r>R(j) & r<=R(j+1);
+                    results.p(s,1,j) =  nanmean(stay(ix));
+                    ix = rt>=median(rt) & data(s).trial(2:end)>1 & r>R(j) & r<=R(j+1);
+                    results.p(s,2,j) =  nanmean(stay(ix));
+                end
+                
+                results.p_change(s,1) = (results.p(s,1,K/2+1) - results.p(s,1,K/2-1))/(D(K/2+1)-D(K/2-1));
+                results.p_change(s,2) = (results.p(s,2,K/2+1) - results.p(s,2,K/2-1))/(D(K/2+1)-D(K/2-1));
+            end
+            
+            figure;
+            mu = squeeze(nanmean(results.rt));
+            se = squeeze(nanstd(results.rt)./sqrt(sum(~isnan(results.rt))));
+            errorbar(mu',se','-o','MarkerSize',12,'MarkerFaceColor','w','LineWidth',4);
+            set(gca,'FontSize',25,'XLim',[0 7],'XTickLabel',0:5,'XTick',1:6);
+            ylabel('Log response time','FontSize',25);
+            xlabel('# samples','FontSize',25);
+            legend({'Stay' 'Switch'},'FontSize',25,'Location','North');
+            set(gcf,'Position',[200 200 500 400])
+            
+            figure;
+            subplot(1,2,1);
+            mu = squeeze(nanmean(results.p));
+            se = squeeze(nanstd(results.p)./sqrt(sum(~isnan(results.p))));
+            errorbar(mu',se','-o','MarkerSize',12,'MarkerFaceColor','w','LineWidth',4);
+            set(gca,'FontSize',25,'XLim',[0.5 length(D)+0.5],'XTickLabel',D,'XTick',1:length(D),'YLim',[-0.1 1.1]);
+            ylabel('P(stay)','FontSize',25);
+            xlabel('Last reward','FontSize',25);
+            legend({'Fast' 'Slow'},'FontSize',25,'Location','East');
+            
+            subplot(1,2,2);
+            [se,mu] = wse(results.p_change);
+            barerrorbar(mu',se');
+            set(gca,'XTickLabel',{'Fast' 'Slow'},'FontSize',25,'XLim',[0.5 2.5]);
+            ylabel('Slope','FontSize',25);
+            set(gcf,'Position',[200 200 1000 400]);
+            
     end
     
 end

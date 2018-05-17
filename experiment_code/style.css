@@ -1,0 +1,96 @@
+#experiment {
+	font-family: Arial, Helvetica;
+	width: 450px;
+}
+
+#Instructions {
+	font-family: Arial, Helvetica;
+}
+
+#title {
+	font-family: Arial, Helvetica;
+	font-weight: bold;
+	font-size: 20;
+	left: 30px;
+	position: relative;
+}
+
+#container {
+	position: relative;
+	background: white;
+	width: 320px;
+	height: 240px;
+	margin: 30px;
+}
+
+.displays {
+	position: absolute;
+	display: none;
+	top: 0px;
+	left: 0px;
+}
+
+#startExperiment {
+	position: absolute;
+	top: 30px;
+	left: 100px;
+	font-weight: bold;
+	color: black;
+	font-size: 14pt;
+}
+
+#startGame {
+	position: absolute;
+	top: 30px;
+	left: 100px;
+	font-weight: bold;
+	color: black;
+	font-size: 14pt;
+}
+
+#endExperiment {
+	position: absolute;
+	top: 100px;
+	left: 100px;
+	font-weight: bold;
+	color: black;
+	font-size: 14pt;
+}
+
+#button1 {
+	width: 70pt;
+	height: 50pt;
+	font-size: 25pt;
+	background-color: green;
+	display: block;
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	border-width: 5px;
+	border-color: white;
+}
+
+#button2 {
+	width: 70pt;
+	height: 50pt;
+	font-size: 25pt;
+	background-color: blue;
+	display: block;
+	position: absolute;
+	top: 10px;
+	left: 150px;
+	border-width: 5px;
+	border-color: white;
+}
+
+#submit {
+	width: 100pt;
+	height: 30pt;
+	font-size: 18pt;
+	left: 55px;
+	top: 100px;
+	position: relative;
+	background-color: white;
+	display: block;
+	float: left
+}
