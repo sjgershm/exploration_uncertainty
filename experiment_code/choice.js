@@ -128,7 +128,7 @@ function nrand(m,sd){
 	} while(rad >= 1 || rad == 0);
 	
 	var c = Math.sqrt(-2 * Math.log(rad) / rad);
-	var y = Math.round((x1 * c * (sd^2))+m);
+	var y = Math.round((x1 * c * sd)+m);
 	return y;
 	}
 };
