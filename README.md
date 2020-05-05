@@ -2,7 +2,7 @@ exploration_uncertainty
 ====
 
 Code and data for:
-Gershman, S.J. (under review). Uncertainty and exploration.
+Gershman, S.J. (in press). Uncertainty and exploration. Decision.
 
 Columns in data.csv file:
 1) subject #
